@@ -1,7 +1,52 @@
 ---
-- hosts: server
+- hosts: all
   tasks:
-    - name: install Midnight Commander
+    - name: Install EPEL Repo package from standard repo
       yum:
-        name: mc
+        name: epel-release
         state: installed
+
+    - name: Install Borg backup 
+      yum:
+        name: borgbackup
+        state: installed
+        update_cache: yes
+
+    - name: Generate /etc/hosts file
+      template:
+        src: hosts.j2
+        dest: /etc/hosts
+
+- hosts: server
+  vars:
+    user: backup
+    group: backup
+    home: /home/backup
+    pool: "{{ home }}/repos"
+
+  tasks:
+    - name: Create backup group 
+      group: 
+        name: "{{ group }}" 
+        state: present
+
+    - name: Add backup user
+      user:
+        name: "{{user}}"
+        shell: /bin/bash
+        home: "{{ home }}"
+        createhome: yes
+        group: "{{ group }}"
+        groups: ''
+        state: present
+
+    # - name: Display all variables/facts known for a host
+    #   debug:
+    #     var: "{{ hostvars[inventory_hostname] | to_nice_json }}"
+
+    # - name: Add authorized keys for backup user
+    #   authorized_key:
+    #     user: "{{ user }}"
+    #     key: "{{ lookup('file', '/home/charlie/.ssh/id_rsa.pub') }}"
+ 
+    

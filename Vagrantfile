@@ -17,16 +17,8 @@ MACHINES = {
 }
 
 Vagrant.configure("2") do |config|
-  MACHINES.each do |boxname, boxconfig|
 
-    config.vm.provision "ansible" do |ansible|
-      ansible.host_vars = {
-        :client => {},
-        :server => {}
-      }
-      ansible.playbook = "playbook.yml"
-      ansible.become = true
-    end
+  MACHINES.each do |boxname, boxconfig|
 
     config.vm.define boxname do |box|
       box.vm.box = boxconfig[:box_name]
@@ -42,4 +34,12 @@ Vagrant.configure("2") do |config|
 
     end
   end
+
+  config.vm.provision "ansible" do |ansible|
+      ansible.host_vars = MACHINES
+      ansible.playbook = "playbook.yml"
+      ansible.become = true
+      ansible.compatibility_mode = "2.0"
+    end
+
 end

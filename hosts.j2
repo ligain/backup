@@ -1,0 +1,9 @@
+
+127.0.0.1           server  server
+127.0.0.1           localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1                 localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+# {{ ansible_managed }}
+{% for host_name, host_vars in hostvars.items() %}
+{{host_vars['ip_addr']}}     {{ host_name }}.localdomain
+{% endfor %}
