@@ -18,7 +18,7 @@ MACHINES = {
 
 Vagrant.configure("2") do |config|
 
-  MACHINES.each do |boxname, boxconfig|
+  MACHINES.each_with_index do |(boxname, boxconfig), idx|
 
     config.vm.define boxname do |box|
       box.vm.box = boxconfig[:box_name]
@@ -32,14 +32,17 @@ Vagrant.configure("2") do |config|
         vb.customize ["modifyvm", :id, "--memory", boxconfig[:memory]]
       end
 
+      # Execute ansible provisioner after all machines are up and running
+      if idx == MACHINES.length - 1
+        box.vm.provision "ansible" do |ansible|
+          ansible.host_vars = MACHINES
+          ansible.playbook = "playbook.yml"
+          ansible.become = true
+          ansible.compatibility_mode = "2.0"
+          ansible.limit = "all"
+        end
+      end
+
     end
   end
-
-  config.vm.provision "ansible" do |ansible|
-      ansible.host_vars = MACHINES
-      ansible.playbook = "playbook.yml"
-      ansible.become = true
-      ansible.compatibility_mode = "2.0"
-    end
-
 end
