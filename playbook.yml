@@ -17,12 +17,14 @@
         src: hosts.j2
         dest: /etc/hosts
 
+
 - hosts: server
   vars:
     user: backup
     group: backup
     home: /home/backup
     pool: "{{ home }}/repos"
+    client_host: client.localdomain
 
   tasks:
     - name: Create backup group 
@@ -40,13 +42,32 @@
         groups: ''
         state: present
 
-    # - name: Display all variables/facts known for a host
-    #   debug:
-    #     var: "{{ hostvars[inventory_hostname] | to_nice_json }}"
+    - name: Extract client's pub key
+      shell: "ssh-keyscan -t rsa {{client_host}} | sed 's/^[^ ]* //'"
+      register: pub_key
 
-    # - name: Add authorized keys for backup user
-    #   authorized_key:
-    #     user: "{{ user }}"
-    #     key: "{{ lookup('file', '/home/charlie/.ssh/id_rsa.pub') }}"
- 
+    - name: Add client's pub key to authorized keys for backup user
+      authorized_key:
+        user: "{{ user }}"
+        key: "{{pub_key.stdout}}"
+        state: present
+        key_options: 'command="cd {{ pool }}/{{client_host}};borg serve --restrict-to-path {{ pool }}/{{client_host}}",restrict'
+
+    - name: Set permissions for authorized_keys file
+      file: 
+        path: "{{ home }}/.ssh/authorized_keys" 
+        owner: "{{ user }}" 
+        group: "{{ group }}" 
+        mode: 0600 
+        state: file
     
+    - name: Set permissions for backup folder
+      file: 
+        path: "{{ pool }}/{{client_host}}" 
+        owner: "{{ user }}" 
+        group: "{{ group }}" 
+        mode: 0700 
+        state: directory 
+
+# - hosts: client
+#   tasks:
