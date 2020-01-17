@@ -18,6 +18,15 @@
         dest: /etc/hosts
 
 
+- hosts: client
+  tasks:
+    - name: Generate SSH key for client
+      openssh_keypair:
+        path: /home/vagrant/.ssh/id_rsa
+        group: vagrant
+        owner: vagrant
+      register: ssh_key
+
 - hosts: server
   vars:
     user: backup
@@ -42,14 +51,12 @@
         groups: ''
         state: present
 
-    - name: Extract client's pub key
-      shell: "ssh-keyscan -t rsa {{client_host}} | sed 's/^[^ ]* //'"
-      register: pub_key
+    # - debug: var=hostvars['client']['ssh_key']['public_key']
 
     - name: Add client's pub key to authorized keys for backup user
       authorized_key:
         user: "{{ user }}"
-        key: "{{pub_key.stdout}}"
+        key: "{{hostvars['client']['ssh_key']['public_key']}}"
         state: present
         key_options: 'command="cd {{ pool }}/{{client_host}};borg serve --restrict-to-path {{ pool }}/{{client_host}}",restrict'
 
@@ -69,5 +76,3 @@
         mode: 0700 
         state: directory 
 
-# - hosts: client
-#   tasks:
