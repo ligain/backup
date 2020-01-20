@@ -1,0 +1,11 @@
+---
+# vars file for borgbackup
+
+backup_user: backup
+backup_group: backup
+backup_home: /home/backup
+backup_pool: "{{backup_home}}/repos"
+client_private_ssh_key: /home/vagrant/.ssh/id_rsa
+client_host: client.localdomain
+server_host: server.localdomain
+backup_script_path: /home/vagrant/borgbackup.sh

@@ -1,5 +1,6 @@
 ---
 - hosts: all
+  
   tasks:
     - name: Install EPEL Repo package from standard repo
       yum:
@@ -22,32 +23,25 @@
   tasks:
     - name: Generate SSH key for client
       openssh_keypair:
-        path: /home/vagrant/.ssh/id_rsa
+        path: "{{client_private_ssh_key}}"
         group: vagrant
         owner: vagrant
       register: ssh_key
 
 - hosts: server
-  vars:
-    user: backup
-    group: backup
-    home: /home/backup
-    pool: "{{ home }}/repos"
-    client_host: client.localdomain
-
   tasks:
     - name: Create backup group 
       group: 
-        name: "{{ group }}" 
+        name: "{{backup_group}}" 
         state: present
 
     - name: Add backup user
       user:
-        name: "{{user}}"
+        name: "{{backup_user}}"
         shell: /bin/bash
-        home: "{{ home }}"
+        home: "{{backup_home}}"
         createhome: yes
-        group: "{{ group }}"
+        group: "{{backup_group}}"
         groups: ''
         state: present
 
@@ -55,24 +49,53 @@
 
     - name: Add client's pub key to authorized keys for backup user
       authorized_key:
-        user: "{{ user }}"
+        user: "{{backup_user}}"
         key: "{{hostvars['client']['ssh_key']['public_key']}}"
         state: present
-        key_options: 'command="cd {{ pool }}/{{client_host}};borg serve --restrict-to-path {{ pool }}/{{client_host}}",restrict'
+        key_options: 'command="cd {{backup_pool}}/{{client_host}};borg serve --restrict-to-path {{backup_pool}}/{{client_host}}",restrict'
 
     - name: Set permissions for authorized_keys file
       file: 
-        path: "{{ home }}/.ssh/authorized_keys" 
-        owner: "{{ user }}" 
-        group: "{{ group }}" 
+        path: "{{backup_home}}/.ssh/authorized_keys" 
+        owner: "{{backup_user}}" 
+        group: "{{backup_group}}" 
         mode: 0600 
         state: file
     
     - name: Set permissions for backup folder
       file: 
-        path: "{{ pool }}/{{client_host}}" 
-        owner: "{{ user }}" 
-        group: "{{ group }}" 
+        path: "{{backup_pool}}/{{client_host}}" 
+        owner: "{{backup_user}}" 
+        group: "{{backup_group}}" 
         mode: 0700 
-        state: directory 
+        state: directory
+
+
+- hosts: client
+  tasks:
+    - name: Init borg repo
+      command: borg init -e none backup@server.localdomain:/home/backup/repos/client.localdomain
+      environment:
+        - BORG_RSH: "ssh -o StrictHostKeyChecking=no -i {{client_private_ssh_key}}"
+      register: borgbackup_initialize_result
+      failed_when: (borgbackup_initialize_result.rc != 0) and (borgbackup_initialize_result.stderr != "") and ('already exists' not in borgbackup_initialize_result.stderr)
+
+    - name: Generate backup script
+      template:
+        dest: "{{backup_script_path}}"
+        src: borgbackup.sh.j2
+        owner: root
+        group: root
+        mode: 0700
+
+    - name:  Setup cronjobs for backup 
+      cron:
+        name: "borg backup {{client_host}}"
+        user: root
+        job: "{{backup_script_path}} 2>&1 | /usr/bin/logger -t borgbackup"
+        day: "*"
+        hour: '7'
+        minute: '40'
+        state: present
+        cron_file: "borgbackup_backup"
 
